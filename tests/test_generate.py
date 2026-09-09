@@ -354,6 +354,12 @@ class GenerateImageTests(unittest.TestCase):
             self.assertEqual(code, 0, stderr)
             self.assertEqual(calls[0]["payload"]["quality"], quality)
 
+    def test_poll_float_rejects_non_finite_values(self) -> None:
+        for value in ("nan", "inf", "-inf"):
+            with self.subTest(value=value):
+                with self.assertRaises(self.module.argparse.ArgumentTypeError):
+                    self.module.positive_float(value)
+
     def test_request_uses_utf8_encoding_for_curl_stdin(self) -> None:
         temp_dir = self.root / "tmp"
         temp_dir.mkdir()

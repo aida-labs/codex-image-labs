@@ -7,6 +7,8 @@ description: "Generate or edit raster images through the configured third-party 
 
 Use this skill when a user wants a bitmap image generated or edited through the current third-party provider, especially when they say "走第三方", "用供应商", or invoke `$image-labs`. It is intentionally separate from the general `imagegen` skill, which may use Codex's built-in image tool.
 
+For installation and updates, use the repository's `scripts/update.py` safe updater. It tests a temporary candidate before replacing the installed skill and keeps a rollback backup. See [README.md](README.md) for platform-specific commands.
+
 ## Provider Contract
 
 - Use `gpt-image-2.5-sunburst` by default with the asynchronous provider endpoints: `POST https://api.lsidestudio.com/v1/images/generations/async` for generation and `POST https://api.lsidestudio.com/v1/images/edits/async` for editing. Their provider-relative aliases are `/images/generations/async` and `/images/edits/async`. `gpt-image-2.5-flare` is the faster everyday alternative and `gpt-image-2` remains only for legacy compatibility; pass `--model` explicitly when the user requests one of them. Do not silently substitute another model, endpoint, local generator, or built-in image tool.
