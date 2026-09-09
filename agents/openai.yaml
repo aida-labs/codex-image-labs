@@ -1,0 +1,4 @@
+interface:
+  display_name: "Image Labs"
+  short_description: "Submit, poll, and verify provider images"
+  default_prompt: "Use $image-labs to asynchronously generate or edit a raster image through the current third-party provider, poll the task to completion, save and verify it under outputs/imagegen/, create its local receipt, and return an inline preview plus the absolute source-file path."
