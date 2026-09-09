@@ -129,10 +129,16 @@ def target_is_dirty(target: Path) -> bool:
 
 def backup_path(target: Path) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    candidate = target.with_name(f"{target.name}.backup-{stamp}")
+    backup_root = (
+        target.parent.parent / "skill-backups"
+        if target.parent.name == "skills"
+        else target.parent / ".skill-backups"
+    )
+    backup_root.mkdir(parents=True, exist_ok=True)
+    candidate = backup_root / f"{target.name}.backup-{stamp}"
     suffix = 1
     while candidate.exists():
-        candidate = target.with_name(f"{target.name}.backup-{stamp}-{suffix}")
+        candidate = backup_root / f"{target.name}.backup-{stamp}-{suffix}"
         suffix += 1
     return candidate
 

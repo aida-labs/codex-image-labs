@@ -70,7 +70,7 @@ class UpdateSkillTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.target / "VERSION").is_file())
         self.assertTrue((self.target / "scripts" / "client.py").is_file())
-        backups = list(self.root.glob("image-labs.backup-*"))
+        backups = list((self.root / ".skill-backups").glob("image-labs.backup-*"))
         self.assertEqual(len(backups), 1)
         self.assertEqual((backups[0] / "old-marker").read_text(encoding="utf-8"), "keep")
         self.assertIn("backup:", result.stdout)
@@ -107,7 +107,7 @@ class UpdateSkillTests(unittest.TestCase):
         (self.target / "old-marker").write_text("old", encoding="utf-8")
         update = self.run_update("--source", str(ROOT), "--target", str(self.target))
         self.assertEqual(update.returncode, 0, update.stderr)
-        backup = next(self.root.glob("image-labs.backup-*"))
+        backup = next((self.root / ".skill-backups").glob("image-labs.backup-*"))
 
         result = self.run_update(
             "--target",
@@ -118,9 +118,30 @@ class UpdateSkillTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.target / "old-marker").read_text(encoding="utf-8"), "old")
-        displaced = [path for path in self.root.glob("image-labs.backup-*") if path != backup]
+        displaced = [
+            path for path in (self.root / ".skill-backups").glob("image-labs.backup-*")
+            if path != backup
+        ]
         self.assertEqual(len(displaced), 1)
         self.assertTrue((displaced[0] / "scripts" / "generate.py").is_file())
+
+    def test_skills_directory_uses_backup_root_outside_skill_scan_path(self) -> None:
+        skills_root = self.root / "skills"
+        self.target = skills_root / "image-labs"
+        self.target.mkdir(parents=True)
+        (self.target / "old-marker").write_text("old", encoding="utf-8")
+
+        result = self.run_update(
+            "--source",
+            str(ROOT),
+            "--target",
+            str(self.target),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / "skill-backups").is_dir())
+        self.assertEqual(list(skills_root.glob("image-labs.backup-*")), [])
+        self.assertEqual(len(list((self.root / "skill-backups").glob("image-labs.backup-*"))), 1)
 
 
 if __name__ == "__main__":
