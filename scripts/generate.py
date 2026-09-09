@@ -30,7 +30,9 @@ GENERATE_ENDPOINT = f"{BASE_URL}/images/generations/async"
 EDIT_ENDPOINT = f"{BASE_URL}/images/edits/async"
 TASK_ENDPOINT = f"{BASE_URL}/images/tasks"
 EXPECTED_BASE_URL = BASE_URL
-MODEL = "gpt-image-2"
+DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+MODEL = DEFAULT_MODEL
+IMAGE_MODELS = ("gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2")
 STANDARD_USER_AGENT = "curl/8.7.1"
 CONNECT_TIMEOUT_SECONDS = 15
 REQUEST_TIMEOUT_SECONDS = 180
@@ -130,9 +132,10 @@ def curl_config(
     if images:
         if method != "POST" or payload is None:
             raise GenerationError("Image uploads require a POST request payload")
+        model_value = str((payload or {}).get("model", DEFAULT_MODEL))
         lines.extend(
             [
-                f"form = {json.dumps('model=' + MODEL)}",
+                f"form = {json.dumps('model=' + model_value)}",
                 f"form = {json.dumps('prompt=' + str(payload['prompt']))}",
                 *(f"form = {json.dumps('image=@' + str(image))}" for image in images),
             ]
@@ -666,7 +669,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-receipt", action="store_true", help="Do not create a JSON receipt")
     parser.add_argument("--json", action="store_true", help="Emit only the final artifact receipt as JSON")
     parser.add_argument("--size", help="Optional provider-supported size, for example 1024x1024")
-    parser.add_argument("--quality", choices=("low", "medium", "high", "auto"), help="Optional image quality")
+    parser.add_argument(
+        "--model",
+        default=DEFAULT_MODEL,
+        help="Image model; defaults to gpt-image-2.5-sunburst. Use gpt-image-2.5-flare for faster everyday generation or gpt-image-2 for legacy compatibility.",
+    )
+    parser.add_argument("--quality", choices=("low", "medium", "high", "xhigh", "max", "auto"), help="Optional image quality")
     parser.add_argument(
         "--poll-interval-seconds",
         type=positive_float,
@@ -739,7 +747,7 @@ def main() -> int:
         if mask and not images:
             raise GenerationError("--mask requires at least one --image")
 
-        payload = {"model": MODEL, "prompt": args.prompt}
+        payload = {"model": args.model or DEFAULT_MODEL, "prompt": args.prompt}
         if args.size:
             payload["size"] = args.size
         if args.quality:
@@ -792,7 +800,7 @@ def main() -> int:
             "format": image_format,
             "http_status": task_status_code,
             "mode": "edit" if images else "generate",
-            "model": MODEL,
+            "model": args.model or DEFAULT_MODEL,
             "output": str(output),
             "receipt": str(receipt_path) if receipt_path else None,
             "sha256": sha256,

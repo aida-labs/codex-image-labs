@@ -1,6 +1,6 @@
 # Image Labs
 
-`image-labs` is a Codex skill for generating or editing raster images through the configured asynchronous third-party `gpt-image-2` provider.
+`image-labs` is a Codex skill for generating or editing raster images through the configured asynchronous third-party provider. It defaults to `gpt-image-2.5-sunburst`; `gpt-image-2.5-flare` is the faster everyday alternative and `gpt-image-2` remains for legacy compatibility.
 
 ## What It Does
 

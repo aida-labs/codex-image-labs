@@ -9,7 +9,7 @@ Use this skill when a user wants a bitmap image generated or edited through the 
 
 ## Provider Contract
 
-- Use `gpt-image-2` with the asynchronous provider endpoints: `POST https://api.lsidestudio.com/v1/images/generations/async` for generation and `POST https://api.lsidestudio.com/v1/images/edits/async` for editing. Their provider-relative aliases are `/images/generations/async` and `/images/edits/async`. Do not silently substitute another model, endpoint, local generator, or built-in image tool.
+- Use `gpt-image-2.5-sunburst` by default with the asynchronous provider endpoints: `POST https://api.lsidestudio.com/v1/images/generations/async` for generation and `POST https://api.lsidestudio.com/v1/images/edits/async` for editing. Their provider-relative aliases are `/images/generations/async` and `/images/edits/async`. `gpt-image-2.5-flare` is the faster everyday alternative and `gpt-image-2` remains only for legacy compatibility; pass `--model` explicitly when the user requests one of them. Do not silently substitute another model, endpoint, local generator, or built-in image tool.
 - Read the Bearer key from the current user's Codex provider configuration at execution time. The helper rejects a missing or mismatched provider `base_url`; never copy a token into source files, prompts, logs, artifacts, or the response.
 - Generation submits JSON with `model` and `prompt`. Editing submits multipart form data with `model`, `prompt`, one or more `image` files, and an optional `mask`; pass optional `size` and `quality` only when useful and supported.
 - A successful submission only creates a task. Extract its nonempty `task_id`, then poll `GET https://api.lsidestudio.com/v1/images/tasks/{task_id}` (provider-relative alias: `/images/tasks/{task_id}`) until the task returns its image payload or an explicit terminal failure. The task ID is used only for the request path and is not persisted in the user-facing receipt. Do not treat `202`, a task ID, or a queued/running status as an image deliverable.
@@ -51,6 +51,8 @@ Format: PNG; size: 123456 bytes; SHA-256: <hash>; submit HTTP: 202; terminal tas
      --json
    ```
 
+   The helper defaults to `--model gpt-image-2.5-sunburst`. Pass `--model gpt-image-2.5-flare` only when the user explicitly wants faster everyday generation, or `--model gpt-image-2` for legacy compatibility.
+
    Editing example:
 
    ```bash
@@ -62,7 +64,7 @@ Format: PNG; size: 123456 bytes; SHA-256: <hash>; submit HTTP: 202; terminal tas
      --json
    ```
 
-   Use `--size` or `--quality` only when useful. The default polling cadence is two seconds and the default task timeout is ten minutes; use `--poll-interval-seconds` or `--poll-timeout-seconds` only when the requested run needs a different bounded wait. A live generation validation completed after 47 polls: its 46 configured waits alone account for at least 92 seconds, and the end-to-end run took roughly 1-2 minutes. Treat that as a current successful sample, not an upstream latency SLA; do not report failure merely because a task takes dozens of polls. Use `--force` only for an explicit replacement. The helper's default receipt path is `<output>.receipt.json`; specify `--receipt` only when the user requires a different local receipt path.
+   Use `--size` or `--quality` only when useful (`--quality` supports `low`, `medium`, `high`, `xhigh`, `max`, and `auto`). The default polling cadence is two seconds and the default task timeout is ten minutes; use `--poll-interval-seconds` or `--poll-timeout-seconds` only when the requested run needs a different bounded wait. A live generation validation completed after 47 polls: its 46 configured waits alone account for at least 92 seconds, and the end-to-end run took roughly 1-2 minutes. Treat that as a current successful sample, not an upstream latency SLA; do not report failure merely because a task takes dozens of polls. Use `--force` only for an explicit replacement. The helper's default receipt path is `<output>.receipt.json`; specify `--receipt` only when the user requires a different local receipt path.
 5. Read the receipt, inspect the saved image when visual quality matters, then send the user-facing result following the delivery contract. Do not expose a signed image URL, raw provider response, or credentials.
 
 ## Failure Handling

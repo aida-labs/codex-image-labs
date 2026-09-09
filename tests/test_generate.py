@@ -292,5 +292,58 @@ class GenerateImageTests(unittest.TestCase):
         self.assertFalse(target.exists())
 
 
+    def test_default_model_is_sunburst(self) -> None:
+        target = self.root / "default-model.png"
+        code, _, stderr, calls, _ = self.run_main(
+            target, self.task_submission(), [self.inline_body()]
+        )
+
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(calls[0]["payload"]["model"], "gpt-image-2.5-sunburst")
+        receipt = json.loads((self.root / "default-model.png.receipt.json").read_text(encoding="utf-8"))
+        self.assertEqual(receipt["model"], "gpt-image-2.5-sunburst")
+
+    def test_model_override_to_flare(self) -> None:
+        target = self.root / "flare-model.png"
+        code, _, stderr, calls, _ = self.run_main(
+            target,
+            self.task_submission(),
+            [self.inline_body()],
+            extra_args=["--model", "gpt-image-2.5-flare"],
+        )
+
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(calls[0]["payload"]["model"], "gpt-image-2.5-flare")
+        receipt = json.loads((self.root / "flare-model.png.receipt.json").read_text(encoding="utf-8"))
+        self.assertEqual(receipt["model"], "gpt-image-2.5-flare")
+
+    def test_edit_form_uses_payload_model(self) -> None:
+        response_path = self.root / "resp.json"
+        config = self.module.curl_config(
+            "fixture-token",
+            response_path,
+            None,
+            url=self.module.EDIT_ENDPOINT,
+            method="POST",
+            payload={"model": "gpt-image-2.5-flare", "prompt": "fixture"},
+            images=(self.root / "source.png",),
+        )
+
+        self.assertIn("model=gpt-image-2.5-flare", config)
+
+    def test_quality_xhigh_and_max_are_accepted(self) -> None:
+        for quality in ("xhigh", "max"):
+            target = self.root / f"quality-{quality}.png"
+            code, _, stderr, calls, _ = self.run_main(
+                target,
+                self.task_submission(),
+                [self.inline_body()],
+                extra_args=["--quality", quality],
+            )
+
+            self.assertEqual(code, 0, stderr)
+            self.assertEqual(calls[0]["payload"]["quality"], quality)
+
+
 if __name__ == "__main__":
     unittest.main()
