@@ -9,6 +9,11 @@
 - Polls `/v1/images/tasks/{task_id}` until a valid image result is available.
 - Downloads, validates, hashes, and records a local image receipt without storing prompts, Bearer tokens, task IDs, or signed result URLs.
 
+## Prerequisites
+
+- Python 3.11 or newer (`python3 --version`; on Windows use `python --version` or `py -3 --version`). The helper reads `config.toml` with the standard-library `tomllib` module and keeps zero third-party dependencies.
+- `curl` on `PATH`. It is preinstalled on macOS and on Windows 10 1803+; on a Windows machine without curl run `winget install cURL.cURL`; on Linux use your package manager, for example `sudo apt install curl`.
+
 ## Install
 
 Clone the repository into the Codex skills directory:
@@ -17,11 +22,24 @@ Clone the repository into the Codex skills directory:
 git clone https://github.com/aida-labs/codex-image-labs.git "${CODEX_HOME:-$HOME/.codex}/skills/image-labs"
 ```
 
+Windows PowerShell equivalent:
+
+```powershell
+git clone https://github.com/aida-labs/codex-image-labs.git "$env:USERPROFILE\.codex\skills\image-labs"
+```
+
 For later updates, use a fast-forward-only pull and run the offline regression suite:
 
 ```bash
 git -C "${CODEX_HOME:-$HOME/.codex}/skills/image-labs" pull --ff-only
 python3 -m unittest discover -s "${CODEX_HOME:-$HOME/.codex}/skills/image-labs/tests" -v
+```
+
+Windows PowerShell equivalent (use `py -3` if `python` is not on `PATH`):
+
+```powershell
+git -C "$env:USERPROFILE\.codex\skills\image-labs" pull --ff-only
+python -m unittest discover -s "$env:USERPROFILE\.codex\skills\image-labs\tests" -v
 ```
 
 Start a new Codex task after an update so the newly installed skill instructions are used.
@@ -38,6 +56,12 @@ Run the bundled offline suite before publishing changes:
 
 ```bash
 python3 -m unittest discover -s "${CODEX_HOME:-$HOME/.codex}/skills/image-labs/tests" -v
+```
+
+Windows PowerShell equivalent:
+
+```powershell
+python -m unittest discover -s "$env:USERPROFILE\.codex\skills\image-labs\tests" -v
 ```
 
 The repository currently has no explicit software license. Public visibility does not grant reuse rights beyond those allowed by applicable law.

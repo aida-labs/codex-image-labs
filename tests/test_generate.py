@@ -11,6 +11,7 @@ import sys
 import tempfile
 import unittest
 import zlib
+from unittest import mock
 from pathlib import Path
 
 
@@ -31,6 +32,15 @@ def build_valid_png() -> bytes:
 
 
 VALID_PNG = build_valid_png()
+
+
+def load_fresh_client():
+    path = Path(__file__).resolve().parents[1] / "scripts" / "client.py"
+    spec = importlib.util.spec_from_file_location("image_labs_client_fresh", path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 def load_module(name: str):
@@ -91,8 +101,8 @@ class GenerateImageTests(unittest.TestCase):
             calls.append(kwargs)
             return next(responses)
 
-        self.module.request = fake_request
-        self.module.time.sleep = lambda delay: sleep_delays.append(delay)
+        self.module.client_module.request = fake_request
+        self.module.tasks_module.time.sleep = lambda delay: sleep_delays.append(delay)
         sys.argv = [
             "generate.py",
             "--prompt",
@@ -228,8 +238,8 @@ class GenerateImageTests(unittest.TestCase):
             return next(responses)
 
         self.module.provider_token = lambda: "fixture-token"
-        self.module.request = fake_request
-        self.module.time.sleep = lambda delay: None
+        self.module.client_module.request = fake_request
+        self.module.tasks_module.time.sleep = lambda delay: None
         sys.argv = ["generate.py", "--prompt", "fixture", "--output", str(target)]
         stdout, stderr = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
@@ -319,7 +329,7 @@ class GenerateImageTests(unittest.TestCase):
 
     def test_edit_form_uses_payload_model(self) -> None:
         response_path = self.root / "resp.json"
-        config = self.module.curl_config(
+        config = self.module.client_module.curl_config(
             "fixture-token",
             response_path,
             None,
@@ -343,6 +353,70 @@ class GenerateImageTests(unittest.TestCase):
 
             self.assertEqual(code, 0, stderr)
             self.assertEqual(calls[0]["payload"]["quality"], quality)
+
+    def test_request_uses_utf8_encoding_for_curl_stdin(self) -> None:
+        temp_dir = self.root / "tmp"
+        temp_dir.mkdir()
+
+        class Completed:
+            stdout = "200"
+            stderr = ""
+            returncode = 0
+
+        client = load_fresh_client()
+        with (
+            mock.patch.object(client.shutil, "which", return_value="/usr/bin/curl"),
+            mock.patch.object(client.subprocess, "run", return_value=Completed()) as run,
+        ):
+            status, body = client.request(
+                url=client.GENERATE_ENDPOINT,
+                method="POST",
+                token="fixture-token",
+                temp_dir=temp_dir,
+                user_agent=None,
+                payload={"model": "gpt-image-2.5-sunburst", "prompt": "中文提示词"},
+                images=(Path("/tmp/张三/source image.png"),),
+            )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(body, "")
+        _, kwargs = run.call_args
+        self.assertEqual(kwargs.get("encoding"), "utf-8")
+        self.assertIn("中文提示词", kwargs.get("input", ""))
+        self.assertIn("张三", kwargs.get("input", ""))
+
+    def test_curl_config_preserves_cjk_prompt_and_path(self) -> None:
+        response_path = self.root / "resp.json"
+        image = Path("/tmp/张三/source image.png")
+        config = self.module.client_module.curl_config(
+            "fixture-token",
+            response_path,
+            None,
+            url=self.module.GENERATE_ENDPOINT,
+            method="POST",
+            payload={"model": "gpt-image-2.5-sunburst", "prompt": "中文提示词"},
+            images=(image,),
+        )
+
+        self.assertIn("中文提示词", config)
+        self.assertIn("张三", config)
+        self.assertIn("source image.png", config)
+        self.assertEqual(config.encode("utf-8").decode("utf-8"), config)
+
+    def test_missing_curl_reports_install_hint(self) -> None:
+        client = self.module.client_module
+        with mock.patch.object(client.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(client.GenerationError, "curl"):
+                client.ensure_curl_available()
+
+    def test_percent_encoded_base64_data_url_is_decoded(self) -> None:
+        target = self.root / "data-url.png"
+        raw = base64.b64encode(VALID_PNG).decode("ascii")
+        encoded = "".join(f"%{ord(char):02X}" if index % 3 == 0 else char for index, char in enumerate(raw))
+        assert encoded != raw  # the payload must actually exercise percent-decoding
+        self.module.client_module.download_url(f"data:image/png;base64,{encoded}", target)
+
+        self.assertEqual(target.read_bytes(), VALID_PNG)
 
 
 if __name__ == "__main__":

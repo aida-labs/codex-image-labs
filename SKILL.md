@@ -42,7 +42,7 @@ Format: PNG; size: 123456 bytes; SHA-256: <hash>; submit HTTP: 202; terminal tas
 1. Infer the mode from inputs: no `--image` means generation; one or more `--image` values means editing. Use `--mask` when the user wants a localized edit; the mask must be a compatible image file.
 2. Preserve the user's subject, style, composition, exact text, and constraints. For edits, state the invariants explicitly: change only the requested element and keep everything else unchanged. Do not invent brand names, slogans, people, or visual elements.
 3. Choose a descriptive, non-conflicting output name such as `outputs/imagegen/quiet-library-study.png`. Do not overwrite an existing image or receipt unless the user explicitly requested replacement and `--force` is justified.
-4. Run the bundled helper. It submits one asynchronous task, polls its task endpoint to a terminal image result, then saves URL-based output only after the download completes. It validates PNG/JPEG/WebP structure, uses the macOS system decoder when available, atomically moves the verified image to the output path, and writes a receipt.
+4. Run the bundled helper. It submits one asynchronous task, polls its task endpoint to a terminal image result, then saves URL-based output only after the download completes. It validates PNG/JPEG/WebP structure, uses the macOS system decoder when available, atomically moves the verified image to the output path, and writes a receipt. The receipt's `verified_by` field is `sips` on macOS and `structural` on systems without the macOS decoder.
 
    ```bash
    python3 "${CODEX_HOME:-$HOME/.codex}/skills/image-labs/scripts/generate.py" \
@@ -50,6 +50,17 @@ Format: PNG; size: 123456 bytes; SHA-256: <hash>; submit HTTP: 202; terminal tas
      --output outputs/imagegen/<descriptive-name>.png \
      --json
    ```
+
+   Windows PowerShell equivalent (use `py -3` if `python` is not on `PATH`):
+
+   ```powershell
+   python "$env:USERPROFILE\.codex\skills\image-labs\scripts\generate.py" `
+     --prompt "<user prompt>" `
+     --output outputs/imagegen/<descriptive-name>.png `
+     --json
+   ```
+
+   Requires Python 3.11 or newer and `curl` on `PATH` (preinstalled on macOS and Windows 10 1803+; otherwise `winget install cURL.cURL` on Windows or the system package manager on Linux).
 
    The helper defaults to `--model gpt-image-2.5-sunburst`. Pass `--model gpt-image-2.5-flare` only when the user explicitly wants faster everyday generation, or `--model gpt-image-2` for legacy compatibility.
 
@@ -70,7 +81,7 @@ Format: PNG; size: 123456 bytes; SHA-256: <hash>; submit HTTP: 202; terminal tas
 ## Failure Handling
 
 - The helper checks submission and polling HTTP statuses, `task_id`, task status, JSON shape, image payload, image completeness, output format, and receipt creation. Its receipt records `task_status` when returned and measured `task_wait_seconds`; these are observability fields, not a provider SLA. It reports file-system, task-timeout, and provider failures as redacted `error:` messages rather than Python tracebacks.
-- If a provider request is rejected with Cloudflare error `1010` during submission or polling, retry exactly once with a standard curl API User-Agent and retain that User-Agent for later polls. If that retry fails, stop that image call and report the provider error with credentials omitted. Continue independent authorized work that does not depend on the missing image; clearly mark the affected deliverable as incomplete until its required asset and verification are available.
+- If a provider request is rejected with Cloudflare error `1010` during submission or polling, retry exactly once with a standard curl API User-Agent and retain that User-Agent for later polls. The retry uses a fixed standard curl User-Agent string regardless of the locally installed curl version. If that retry fails, stop that image call and report the provider error with credentials omitted. Continue independent authorized work that does not depend on the missing image; clearly mark the affected deliverable as incomplete until its required asset and verification are available.
 - If the task returns an unsupported response shape, never infer completion from elapsed time or HTTP `200`: stop with a contract error. The helper accepts the existing `data[].url` / `b64_json` image result shape and common `result`, `output`, or `response` wrappers; update it against a verified provider sample before broadening that parser. If a returned task state contradicts its image payload, such as `processing` or `failed` alongside an image, stop rather than reporting a false completion.
 - Do not fall back silently. A provider failure is a provider failure; ask before using another route.
 
@@ -78,8 +89,10 @@ Format: PNG; size: 123456 bytes; SHA-256: <hash>; submit HTTP: 202; terminal tas
 
 For a vague request, organize the prompt as: subject and action, scene/background, visual medium, composition/framing, lighting/mood, intended use, exact text, and constraints/avoid list. Keep the final prompt concise. For exact in-image text, quote it verbatim and require accurate spelling.
 
-The reusable execution path is implemented in [scripts/generate.py](scripts/generate.py). Run its offline regression suite with:
+The reusable execution path is a thin CLI in [scripts/generate.py](scripts/generate.py) over three modules: [scripts/client.py](scripts/client.py) (provider auth, curl transport, async submit/poll, download), [scripts/tasks.py](scripts/tasks.py) (task response parsing and polling to completion), and [scripts/validators.py](scripts/validators.py) (image structure plus system-decoder verification and local artifact files). Run its offline regression suite with:
 
 ```bash
 python3 -m unittest discover -s "${CODEX_HOME:-$HOME/.codex}/skills/image-labs/tests" -v
 ```
+
+On Windows PowerShell, replace `python3` with `python` (or `py -3`) and `${CODEX_HOME:-$HOME/.codex}` with `$env:CODEX_HOME` (or `$env:USERPROFILE\.codex`).
